@@ -88,18 +88,22 @@ pipeline {
         }
 
         stage('Docker Push') {
-            steps {
-                script {
-                    withDockerRegistry(
-                        credentialsId: 'docker'
-                    ) {
-                        sh '''
-                            docker push $DOCKER_IMAGE
-                        '''
-                    }
-                }
-            }
-        }
+           steps {
+                 withCredentials([
+                 usernamePassword(
+               	 credentialsId: 'docker',
+                 usernameVariable: 'DOCKER_USERNAME',
+                 passwordVariable: 'DOCKER_PASSWORD'
+	              )
+ 	       ]) {
+        	    sh '''
+                	echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+                	docker push "$DOCKER_IMAGE"
+                	docker logout
+            	'''
+       			 }
+	    }
+	}
 
         stage('Deploy to Kubernetes') {
             steps {
