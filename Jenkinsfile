@@ -55,30 +55,32 @@ pipeline {
             }
         }
 
-	stage('OWASP Dependency Check') {
-    steps {
-        withCredentials([
-            string(
-                credentialsId: 'nvd-api-key',
-                variable: 'NVD_API_KEY'
-            )
-        ]) {
-            dependencyCheck(
-                additionalArguments: "--scan ./bookmyshow-app --disableYarnAudit --disableNodeAudit --nvdApiKey $NVD_API_KEY",
-                odcInstallation: 'DP-Check'
-            )
+	 stage('OWASP Dependency Check') {
+            steps {
+                withCredentials([
+                    string(
+                        credentialsId: 'nvd-api-key',
+                        variable: 'NVD_API_KEY'
+                    )
+                ]) {
+                    dependencyCheck(
+                        additionalArguments: "--scan ./bookmyshow-app --disableYarnAudit --disableNodeAudit --nvdApiKey $NVD_API_KEY",
+                        odcInstallation: 'DP-Check'
+                    )
 
-            dependencyCheckPublisher(
-                pattern: '**/dependency-check-report.xml'
-            )
+                    dependencyCheckPublisher(
+                        pattern: '**/dependency-check-report.xml'
+                    )
+                }
+            }
         }
-    }
-}
 
         stage('Trivy Filesystem Scan') {
             steps {
                 sh '''
-                    trivy fs --no-progress . > trivyfs.txt
+                    trivy fs --no-progress \
+                        --skip-files '**/dependency-check-report.xml' \
+                        . > trivyfs.txt
                 '''
             }
         }
@@ -94,23 +96,24 @@ pipeline {
             }
         }
 
-        stage('Docker Push') {
+	stage('Docker Push') {
            steps {
                  withCredentials([
                  usernamePassword(
-               	 credentialsId: 'docker',
+                 credentialsId: 'docker',
                  usernameVariable: 'DOCKER_USERNAME',
                  passwordVariable: 'DOCKER_PASSWORD'
-	              )
- 	       ]) {
-        	    sh '''
-                	echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
-                	docker push "$DOCKER_IMAGE"
-                	docker logout
-            	'''
-       			 }
-	    }
-	}
+                      )
+               ]) {
+                    sh '''
+                        echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+                        docker push "$DOCKER_IMAGE"
+                        docker logout
+                '''
+                  }
+             }
+        }
+
 
         stage('Deploy to Kubernetes') {
             steps {
